@@ -10,16 +10,29 @@
 import
   std/[unittest, os],
   ../miniz/gzip
-  
+
+proc toBytes(s: string): seq[byte] =
+  result = newSeq[byte](s.len)
+  if s.len > 0:
+    copyMem(result[0].addr, s[0].unsafeAddr, s.len)
+
 suite "gzip test suite":
-  const 
+  const
     rawFolder = "tests" / "data"
-  
+
   for path in walkDirRec(rawFolder):
     let parts = splitFile(path)
     test parts.name:
       let s = readFile(path)
-      let str = string.gzip(s)
-      let bytes = seq[byte].gzip(s)
-      check bytes.len == str.len
-      
+      let cstr = string.gzip(s)
+      let cbytes = seq[byte].gzip(s)
+      check cbytes.len == cstr.len
+
+      let dcstr  = string.ungzip(cbytes)
+      let dcstr2 = string.ungzip(cstr)
+      let dcbytes = seq[byte].ungzip(cbytes)
+      let dcbytes2 = seq[byte].ungzip(cstr)
+      check dcbytes2 == s.toBytes
+      check dcbytes == s.toBytes
+      check dcstr2 == s
+      check dcstr == s

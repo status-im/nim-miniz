@@ -71,3 +71,39 @@ proc gzip*[T: byte|char](N: type, source: openArray[T]): N =
 
   result.setLen(mz.total_out.int + 18)
   assert(mz.deflateEnd() == MZ_OK)
+
+proc ungzip*[T: byte|char](N: type, data: openArray[T]): N =
+  var mz = MzStream(
+    next_in: if data.len == 0:
+               nil
+             else:
+               cast[ptr cuchar](data[10].unsafeAddr),
+    avail_in: data.len.cuint - 18
+  )
+
+  const windowBits = MZ_RAW_DEFLATE
+  doAssert(mz.inflateInit2(windowBits) == MZ_OK)
+  var res: seq[byte]
+  var buf: array[0xFFFF, byte]
+
+  while true:
+    mz.next_out  = cast[ptr cuchar](buf[0].addr)
+    mz.avail_out = buf.len.cuint
+    let r = mz.inflate(MZ_SYNC_FLUSH)
+    let outSize = buf.len - mz.avail_out.int
+    res.add toOpenArray(buf, 0, outSize-1)
+    if r == MZ_STREAM_END:
+      break
+    elif r == MZ_OK:
+      continue
+    else:
+      doAssert(false, "decompression error")
+
+  doAssert(mz.inflateEnd() == MZ_OK)
+
+  when N is string:
+    cast[string](res)
+  elif N is seq[byte]:
+    res
+  else:
+    {.fatal: "unsupported output type".}
