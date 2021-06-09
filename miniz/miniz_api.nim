@@ -38,11 +38,22 @@ type
     MZ_LEVEL_3              = 3
     MZ_LEVEL_4              = 4
     MZ_LEVEL_5              = 5
-    MZ_DEFAULT_LEVEL        = 6
+    MZ_LEVEL_6              = 6
     MZ_LEVEL_7              = 7
     MZ_LEVEL_8              = 8
     MZ_BEST_COMPRESSION     = 9
     MZ_UBER_COMPRESSION     = 10
+
+  MzMemLevel* {.size: sizeof(cint).} = enum
+    MZ_MEM_1 = 1
+    MZ_MEM_2 = 2
+    MZ_MEM_3 = 3
+    MZ_MEM_4 = 4
+    MZ_MEM_5 = 5
+    MZ_MEM_6 = 6
+    MZ_MEM_7 = 7
+    MZ_MEM_8 = 8
+    MZ_MEM_9 = 9
 
   MzMethod* {.size: sizeof(cint).} = enum
     MZ_DEFLATED = 8
@@ -64,7 +75,7 @@ type
     MZ_WINDOW_BITS_12      = 12
     MZ_WINDOW_BITS_13      = 13
     MZ_WINDOW_BITS_14      = 14
-    MZ_DEFAULT_WINDOW_BITS = 15
+    MZ_WINDOW_BITS_15      = 15
 
   MzStrategy* {.size: sizeof(cint).} = enum
     MZ_DEFAULT_STRATEGY = 0
@@ -90,6 +101,11 @@ type
     avail_out* : cuint    # number of bytes that can be written to next_out
     total_out* : culong   # total number of bytes produced so far
 
+const
+  MZ_DEFAULT_MEM_LEVEL*   = MZ_MEM_8
+  MZ_DEFAULT_WINDOW_BITS* = MZ_WINDOW_BITS_15
+  MZ_DEFAULT_LEVEL*       = MZ_LEVEL_6
+
 proc mz_version*(): ptr char {.cdecl, importc: "mz_version",
               header: "miniz.h".}
 
@@ -97,7 +113,7 @@ proc deflateInit*(mz: var MzStream, level: MzLevel): MzError {.cdecl,
                   importc: "mz_deflateInit", header: "miniz.h".}
 
 proc deflateInit2*(mz: var MzStream, level: MzLevel, meth: MzMethod,
-                   windowBits: MzWindowBits, memLevel: cint,
+                   windowBits: MzWindowBits, memLevel: MzMemLevel,
                    strategy: MzStrategy): MzError {.cdecl,
                    importc: "mz_deflateInit2", header: "miniz.h".}
 

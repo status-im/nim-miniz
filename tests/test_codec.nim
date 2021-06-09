@@ -49,7 +49,7 @@ proc compress[T: byte | char](data: openArray[T]): seq[byte] =
     level = MZ_DEFAULT_LEVEL,
     meth  = MZ_DEFLATED,
     windowBits,
-    1,
+    memLevel = MZ_DEFAULT_MEM_LEVEL,
     strategy = MZ_DEFAULT_STRATEGY) == MZ_OK
   )
 

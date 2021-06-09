@@ -26,7 +26,7 @@ proc gzip*[T: byte|char](N: type, source: openArray[T]): N =
     MZ_DEFAULT_LEVEL,
     MZ_DEFLATED,
     MZ_RAW_DEFLATE,
-    1,
+    MZ_DEFAULT_MEM_LEVEL,
     MZ_DEFAULT_STRATEGY) == MZ_OK
   )
 
