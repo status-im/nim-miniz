@@ -8,9 +8,10 @@
 # those terms.
 
 import
+  stew/results,
   ./miniz_api
 
-proc gzip*[T: byte|char](N: type, source: openArray[T]): N =
+proc gzip*[T: byte|char](N: type, source: openArray[T]): Result[N, string] =
   # all these cast[ptr cuchar] is need because
   # clang++ will complaints about incompatible
   # pointer types
@@ -22,57 +23,66 @@ proc gzip*[T: byte|char](N: type, source: openArray[T]): N =
     avail_in: source.len.cuint
   )
 
-  assert(mz.deflateInit2(
+  var r = mz.deflateInit2(
     MZ_DEFAULT_LEVEL,
     MZ_DEFLATED,
     MZ_RAW_DEFLATE,
     MZ_DEFAULT_MEM_LEVEL,
-    MZ_DEFAULT_STRATEGY) == MZ_OK
-  )
+    MZ_DEFAULT_STRATEGY)
+
+  if r != MZ_OK:
+    return err($r)
 
   let maxSize = mz.deflateBound(source.len.culong).int
   when N is string:
     type CC = char
-    result = newString(maxSize + 18)
+    var res = newString(maxSize + 18)
   elif N is seq[byte]:
     type CC = byte
-    result = newSeq[byte](maxSize + 18)
+    var res = newSeq[byte](maxSize + 18)
   else:
     {.fatal: "unsupported output type".}
 
-  result[0] = 0x1F.CC
-  result[1] = 0x8B.CC
-  result[2] = 8.CC
-  result[3] = 0.CC
-  result[4] = 0.CC
-  result[5] = 0.CC
-  result[6] = 0.CC
-  result[7] = 0.CC
-  result[8] = 0.CC
-  result[9] = 0xFF.CC
+  res[0] = 0x1F.CC
+  res[1] = 0x8B.CC
+  res[2] = 8.CC
+  res[3] = 0.CC
+  res[4] = 0.CC
+  res[5] = 0.CC
+  res[6] = 0.CC
+  res[7] = 0.CC
+  res[8] = 0.CC
+  res[9] = 0xFF.CC
 
-  mz.next_out = cast[ptr cuchar](result[10].addr)
-  mz.avail_out = (result.len - 10).cuint
-  assert(mz.deflate(MZ_FINISH) == MZ_STREAM_END)
+  mz.next_out = cast[ptr cuchar](res[10].addr)
+  mz.avail_out = (res.len - 10).cuint
+  r = mz.deflate(MZ_FINISH)
+
+  if r != MZ_STREAM_END:
+    return err($r)
 
   let
     size  = mz.total_out.int
     crc   = mz_crc32(source)
     ssize = source.len
 
-  result[size + 10] = CC(         crc and 0xFF)
-  result[size + 11] = CC((crc shr 8)  and 0xFF)
-  result[size + 12] = CC((crc shr 16) and 0xFF)
-  result[size + 13] = CC((crc shr 24) and 0xFF)
-  result[size + 14] = CC(         ssize and 0xFF)
-  result[size + 15] = CC((ssize shr 8)  and 0xFF)
-  result[size + 16] = CC((ssize shr 16) and 0xFF)
-  result[size + 17] = CC((ssize shr 24) and 0xFF)
+  res[size + 10] = CC(         crc and 0xFF)
+  res[size + 11] = CC((crc shr 8)  and 0xFF)
+  res[size + 12] = CC((crc shr 16) and 0xFF)
+  res[size + 13] = CC((crc shr 24) and 0xFF)
+  res[size + 14] = CC(         ssize and 0xFF)
+  res[size + 15] = CC((ssize shr 8)  and 0xFF)
+  res[size + 16] = CC((ssize shr 16) and 0xFF)
+  res[size + 17] = CC((ssize shr 24) and 0xFF)
 
-  result.setLen(mz.total_out.int + 18)
-  assert(mz.deflateEnd() == MZ_OK)
+  res.setLen(mz.total_out.int + 18)
+  r = mz.deflateEnd()
+  if r != MZ_OK:
+    return err($r)
 
-proc ungzip*[T: byte|char](N: type, data: openArray[T]): N =
+  ok(res)
+
+proc ungzip*[T: byte|char](N: type, data: openArray[T]): Result[N, string] =
   var mz = MzStream(
     next_in: if data.len == 0:
                nil
@@ -82,28 +92,38 @@ proc ungzip*[T: byte|char](N: type, data: openArray[T]): N =
   )
 
   const windowBits = MZ_RAW_DEFLATE
-  doAssert(mz.inflateInit2(windowBits) == MZ_OK)
+  var r = mz.inflateInit2(windowBits)
+
+  if r != MZ_OK:
+    return err($r)
+
   var res: seq[byte]
   var buf: array[0xFFFF, byte]
 
   while true:
     mz.next_out  = cast[ptr cuchar](buf[0].addr)
     mz.avail_out = buf.len.cuint
-    let r = mz.inflate(MZ_SYNC_FLUSH)
+    r = mz.inflate(MZ_SYNC_FLUSH)
     let outSize = buf.len - mz.avail_out.int
     res.add toOpenArray(buf, 0, outSize-1)
     if r == MZ_STREAM_END:
       break
     elif r == MZ_OK:
-      continue
+      # need more input or more output available
+      if mz.avail_in > 0 or mz.avail_out == 0:
+        continue
+      else:
+        break
     else:
-      doAssert(false, "decompression error")
+      return err("decompression error: " & $r)
 
-  doAssert(mz.inflateEnd() == MZ_OK)
+  r = mz.inflateEnd()
+  if r != MZ_OK:
+    return err($r)
 
   when N is string:
-    cast[string](res)
+    ok(cast[string](res))
   elif N is seq[byte]:
-    res
+    ok(res)
   else:
     {.fatal: "unsupported output type".}

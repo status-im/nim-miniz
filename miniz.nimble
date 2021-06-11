@@ -17,6 +17,7 @@ license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
 requires "nim >= 1.2.0"
+requires "stew >= 0.1.0"
 
 # Helper functions
 proc test(env, path: string) =

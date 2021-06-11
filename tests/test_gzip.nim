@@ -9,6 +9,7 @@
 
 import
   std/[unittest, os],
+  stew/results,
   ../miniz/gzip
 
 proc toBytes(s: string): seq[byte] =
@@ -24,14 +25,14 @@ suite "gzip test suite":
     let parts = splitFile(path)
     test parts.name:
       let s = readFile(path)
-      let cstr = string.gzip(s)
-      let cbytes = seq[byte].gzip(s)
+      let cstr = string.gzip(s).get()
+      let cbytes = seq[byte].gzip(s).get()
       check cbytes.len == cstr.len
 
-      let dcstr  = string.ungzip(cbytes)
-      let dcstr2 = string.ungzip(cstr)
-      let dcbytes = seq[byte].ungzip(cbytes)
-      let dcbytes2 = seq[byte].ungzip(cstr)
+      let dcstr  = string.ungzip(cbytes).get()
+      let dcstr2 = string.ungzip(cstr).get()
+      let dcbytes = seq[byte].ungzip(cbytes).get()
+      let dcbytes2 = seq[byte].ungzip(cstr).get()
       check dcbytes2 == s.toBytes
       check dcbytes == s.toBytes
       check dcstr2 == s
